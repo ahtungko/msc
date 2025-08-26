@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Search & Downloader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .container {
+            max-width: 90vw;
+            margin: auto;
+        }
+        .download-button, .play-button {
+            transition: transform 0.2s ease-in-out;
+        }
+        .download-button:hover, .play-button:hover {
+            transform: translateY(-2px);
+        }
+        .spinner {
+            border-top-color: #3498db;
+            border-left-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 p-4 sm:p-8">
+
+    <div class="container bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl space-y-8">
+        <header class="text-center">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-blue-400 mb-2">Music Search & Downloader</h1>
+            <p class="text-gray-400">Search for music and download individual songs or in a batch.</p>
+        </header>
+
+        <!-- API Configuration Section -->
+        <div class="space-y-4 p-4 bg-gray-700 rounded-xl shadow-inner">
+            <h2 class="text-xl font-bold">API Settings</h2>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="flex-grow">
+                    <label for="searchApiUrl" class="block text-sm font-medium text-gray-300">Search API URL:</label>
+                    <input type="url" id="searchApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+                </div>
+                <div class="flex-grow">
+                    <label for="downloadApiUrl" class="block text-sm font-medium text-gray-300">Download API URL:</label>
+                    <input type="url" id="downloadApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+                </div>
+            </div>
+            <p class="text-sm text-gray-400">APIs will be saved in your browser's cookies.</p>
+        </div>
+
+        <!-- Search Section -->
+        <div class="space-y-4">
+            <label for="searchKey" class="block text-sm font-medium text-gray-300">Search for an artist or song:</label>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="searchKey" placeholder="Enter search key..." class="flex-grow p-3 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-500">
+                <button id="fetchBtn" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 download-button">
+                    Search Music
+                </button>
+            </div>
+        </div>
+
+        <!-- Status & Loading -->
+        <div id="statusMessage" class="text-center font-medium"></div>
+        <div id="loadingIndicator" class="hidden flex justify-center items-center">
+            <div class="spinner w-8 h-8 rounded-full border-4 border-gray-600"></div>
+        </div>
+        
+        <!-- Music List Section -->
+        <div id="musicListContainer" class="hidden overflow-x-auto">
+            <!-- Global Quality Selector & Delay Section -->
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                <div class="flex flex-col sm:flex-row items-center gap-2">
+                    <label for="globalQualitySelect" class="block text-sm font-medium text-gray-300">Set Quality for All:</label>
+                    <div class="flex gap-2">
+                        <select id="globalQualitySelect" class="bg-gray-700 border border-gray-600 rounded-xl p-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                        <button id="applyQualityBtn" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">Apply to All</button>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center gap-2 mt-4 sm:mt-0">
+                    <label for="downloadDelay" class="block text-sm font-medium text-gray-300">Download Delay (seconds):</label>
+                    <input type="number" id="downloadDelay" value="1" min="0" class="w-20 p-2 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 mb-6">
+                <button id="selectAllBtn" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">Select All</button>
+                <button id="downloadAllBtn" class="bg-emerald-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 download-button">Download Selected</button>
+            </div>
+
+            <table class="min-w-full divide-y divide-gray-700 rounded-xl overflow-hidden shadow-lg">
+                <thead class="bg-gray-700">
+                    <tr>
+                        <th scope="col" class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider">
+                            <input type="checkbox" id="masterCheckbox" class="rounded text-blue-600 focus:ring-blue-500">
+                        </th>
+                        <th scope="col" class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider">Title</th>
+                        <th scope="col" class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell">Artist</th>
+                        <th scope="col" class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell">Album</th>
+                        <th scope="col" class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider">Quality</th>
+                        <th scope="col" class="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="musicTableBody" class="bg-gray-800 divide-y divide-gray-700">
+                    <!-- Music rows will be injected here by JavaScript -->
+                </tbody>
+            </table>
+
+            <!-- Pagination Controls -->
+            <div class="flex justify-between items-center mt-6">
+                <button id="prevPageBtn" class="pagination-btn bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">Previous Page</button>
+                <span id="pageInfo" class="text-sm font-medium text-gray-400"></span>
+                <button id="nextPageBtn" class="pagination-btn bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">Next Page</button>
+            </div>
+
+            <div id="downloadMessage" class="hidden text-center mt-6">
+                <div class="bg-green-700 text-white p-4 rounded-xl shadow-lg">
+                    Downloading... Please check your browser's downloads.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Audio Player -->
+    <div id="audioPlayerContainer" class="hidden fixed bottom-0 left-0 right-0 bg-gray-800 p-4 border-t border-gray-700 shadow-xl z-50">
+        <h3 id="currentSongTitle" class="text-sm font-semibold text-gray-300 mb-2"></h3>
+        <audio id="audioPlayer" controls class="w-full"></audio>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fetchBtn = document.getElementById('fetchBtn');
+            const searchKeyInput = document.getElementById('searchKey');
+            const musicTableBody = document.getElementById('musicTableBody');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const statusMessage = document.getElementById('statusMessage');
+            const musicListContainer = document.getElementById('musicListContainer');
+            const downloadAllBtn = document.getElementById('downloadAllBtn');
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            const masterCheckbox = document.getElementById('masterCheckbox');
+            const downloadMessage = document.getElementById('downloadMessage');
+            const globalQualitySelect = document.getElementById('globalQualitySelect');
+            const applyQualityBtn = document.getElementById('applyQualityBtn');
+            const prevPageBtn = document.getElementById('prevPageBtn');
+            const nextPageBtn = document.getElementById('nextPageBtn');
+            const pageInfo = document.getElementById('pageInfo');
+            const downloadDelayInput = document.getElementById('downloadDelay');
+            const audioPlayerContainer = document.getElementById('audioPlayerContainer');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const currentSongTitle = document.getElementById('currentSongTitle');
+            const searchApiUrlInput = document.getElementById('searchApiUrl');
+            const downloadApiUrlInput = document.getElementById('downloadApiUrl');
+            const modal = document.createElement('div');
+            
+            let allMusicData = []; // Store the fetched music data globally
+            let currentPage = 1;
+            let totalPages = 1;
+            const pageSize = 20;
+            let currentPlayingBlobUrl = null;
+            
+            // Default URLs, will be overwritten by cookies if they exist
+            const DEFAULT_API_SEARCH_URL = 'https://music.wjhe.top/api/music/joox/search';
+            const DEFAULT_API_DOWNLOAD_URL = 'https://music.wjhe.top/api/music/joox/url';
+
+            // --- Cookie Management Functions ---
+            function setCookie(name, value, days) {
+                const d = new Date();
+                d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+                const expires = "expires=" + d.toUTCString();
+                document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
+            }
+
+            function getCookie(name) {
+                const cname = name + "=";
+                const decodedCookie = decodeURIComponent(document.cookie);
+                const ca = decodedCookie.split(';');
+                for(let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) === ' ') {
+                        c = c.substring(1);
+                    }
+                    if (c.indexOf(cname) === 0) {
+                        return c.substring(cname.length, c.length);
+                    }
+                }
+                return "";
+            }
+
+            // Load URLs from cookies on page load
+            const savedSearchUrl = getCookie('searchApiUrl');
+            const savedDownloadUrl = getCookie('downloadApiUrl');
+
+            if (savedSearchUrl) {
+                searchApiUrlInput.value = savedSearchUrl;
+            } else {
+                searchApiUrlInput.value = DEFAULT_API_SEARCH_URL;
+            }
+
+            if (savedDownloadUrl) {
+                downloadApiUrlInput.value = savedDownloadUrl;
+            } else {
+                downloadApiUrlInput.value = DEFAULT_API_DOWNLOAD_URL;
+            }
+
+            // --- End of Cookie Management ---
+
+            // Displays a custom message box instead of alert()
+            function showMessageBox(message) {
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4';
+                modal.innerHTML = `
+                    <div class="bg-gray-800 rounded-xl p-6 text-center max-w-sm w-full shadow-2xl space-y-4">
+                        <p class="text-white text-lg">${message}</p>
+                        <button class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-blue-700" onclick="document.body.removeChild(this.parentNode.parentNode);">OK</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            
+            // Fetches data based on search key and page number
+            async function fetchData(searchKey, pageIndex) {
+                const searchApiUrl = searchApiUrlInput.value.trim();
+                const downloadApiUrl = downloadApiUrlInput.value.trim();
+
+                // Save user-provided URLs to cookies for future use
+                setCookie('searchApiUrl', searchApiUrl, 365);
+                setCookie('downloadApiUrl', downloadApiUrl, 365);
+
+                if (!searchKey || !searchApiUrl) {
+                    showMessageBox('Please enter a search key and a valid Search API URL.');
+                    return;
+                }
+                
+                statusMessage.textContent = '';
+                loadingIndicator.classList.remove('hidden');
+                musicTableBody.innerHTML = '';
+                musicListContainer.classList.add('hidden');
+                downloadMessage.classList.add('hidden');
+                allMusicData = [];
+                console.log(`Attempting to fetch music for "${searchKey}" on page ${pageIndex}`);
+
+                try {
+                    const url = `${searchApiUrl}?key=${encodeURIComponent(searchKey)}&pageIndex=${pageIndex}&pageSize=${pageSize}`;
+                    const proxyUrl = 'https://cors.eu.org/' + url;
+                    const response = await fetch(proxyUrl);
+                    
+                    if (!response.ok) {
+                        console.error('HTTP error from proxy:', response.status);
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+
+                    if (data.data && data.data.data && data.data.data.length > 0) {
+                        allMusicData = data.data.data;
+                        const paging = data.data.pagingVO;
+                        currentPage = paging.pageIndex;
+                        totalPages = Math.ceil(paging.totalNum / paging.pageSize);
+                        
+                        updatePaginationControls();
+                        renderMusicList(allMusicData);
+                        musicListContainer.classList.remove('hidden');
+                    } else {
+                        statusMessage.textContent = 'No music data found for this search. Please try a different key.';
+                        updatePaginationControls();
+                    }
+                } catch (error) {
+                    console.error('Error fetching music data:', error);
+                    statusMessage.textContent = 'Failed to fetch music. Please check your search key and network connection.';
+                } finally {
+                    loadingIndicator.classList.add('hidden');
+                }
+            }
+
+            // Update pagination button states and info text
+            function updatePaginationControls() {
+                prevPageBtn.disabled = currentPage <= 1;
+                nextPageBtn.disabled = currentPage >= totalPages;
+                pageInfo.textContent = `Page ${currentPage} of ${totalPages} (Total songs: ${allMusicData.length})`;
+            }
+
+            // Event listener for the main search button
+            fetchBtn.addEventListener('click', () => {
+                const searchKey = searchKeyInput.value.trim();
+                currentPage = 1; // Reset to page 1 for new search
+                fetchData(searchKey, currentPage);
+            });
+
+            // Event listeners for pagination buttons
+            prevPageBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fetchData(searchKeyInput.value.trim(), currentPage);
+                }
+            });
+
+            nextPageBtn.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    fetchData(searchKeyInput.value.trim(), currentPage);
+                }
+            });
+
+            // Renders the list of songs in the table and populates the global quality dropdown
+            function renderMusicList(songs) {
+                musicTableBody.innerHTML = '';
+                globalQualitySelect.innerHTML = '';
+                
+                const uniqueQualities = new Set();
+                const uniqueFormats = {};
+
+                songs.forEach(song => {
+                    song.fileLinks.forEach(link => {
+                        const uniqueKey = `${link.quality}_${link.format}`;
+                        if (!uniqueQualities.has(uniqueKey)) {
+                            uniqueQualities.add(uniqueKey);
+                            if (!uniqueFormats[link.format]) {
+                                uniqueFormats[link.format] = [];
+                            }
+                            uniqueFormats[link.format].push({ quality: link.quality, value: uniqueKey });
+                        }
+                    });
+                });
+
+                // Populate the global quality selector with unique formats and sorted qualities
+                for (const format in uniqueFormats) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = format.toUpperCase();
+                    
+                    uniqueFormats[format].sort((a, b) => b.quality - a.quality).forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.value;
+                        option.textContent = `${item.quality}kbps (${format})`;
+                        optgroup.appendChild(option);
+                    });
+                    globalQualitySelect.appendChild(optgroup);
+                }
+
+                songs.forEach((song, index) => {
+                    const row = document.createElement('tr');
+                    row.classList.add('hover:bg-gray-700', 'transition-colors', 'duration-200');
+                    if (index % 2 === 0) {
+                        row.classList.add('bg-gray-800');
+                    } else {
+                        row.classList.add('bg-gray-800');
+                    }
+
+                    // Create quality options dropdown for each song
+                    const qualityDropdown = document.createElement('select');
+                    qualityDropdown.classList.add('w-full', 'bg-gray-700', 'border', 'border-gray-600', 'rounded-lg', 'p-2', 'text-gray-200');
+                    let bestQuality = { quality: 0 };
+                    
+                    song.fileLinks.forEach(link => {
+                        const option = document.createElement('option');
+                        option.value = `${link.quality}_${link.format}`;
+                        option.textContent = `${link.quality}kbps (${link.format})`;
+                        qualityDropdown.appendChild(option);
+                        if (link.quality > bestQuality.quality) {
+                            bestQuality = link;
+                        }
+                    });
+                    qualityDropdown.value = `${bestQuality.quality}_${bestQuality.format}`;
+
+                    // Create individual download button
+                    const individualDownloadBtn = document.createElement('button');
+                    individualDownloadBtn.classList.add('bg-blue-600', 'text-white', 'font-medium', 'px-3', 'py-1', 'rounded-xl', 'hover:bg-blue-700', 'transition-colors', 'download-button', 'text-sm');
+                    individualDownloadBtn.textContent = 'Download';
+                    individualDownloadBtn.addEventListener('click', () => {
+                        const [quality, format] = qualityDropdown.value.split('_');
+                        downloadFileAsBlob(song.ID, quality, format, song.title, song.singers[0].name);
+                    });
+
+                    // Create play button
+                    const playBtn = document.createElement('button');
+                    playBtn.classList.add('bg-purple-600', 'text-white', 'font-medium', 'px-3', 'py-1', 'rounded-xl', 'hover:bg-purple-700', 'transition-colors', 'play-button', 'text-sm', 'ml-2');
+                    playBtn.textContent = 'Play';
+                    playBtn.addEventListener('click', () => {
+                        const [quality, format] = qualityDropdown.value.split('_');
+                        playSongAsBlob(song.ID, quality, format, song.title, song.singers[0].name);
+                    });
+                    
+                    row.innerHTML = `
+                        <td class="py-4 px-4 text-sm">
+                            <input type="checkbox" class="song-checkbox rounded text-blue-600 focus:ring-blue-500" data-song-id="${song.ID}" data-title="${encodeURIComponent(song.title)}" data-artist="${encodeURIComponent(song.singers[0].name)}">
+                        </td>
+                        <td class="py-4 px-4 text-sm font-medium">${song.title}</td>
+                        <td class="py-4 px-4 text-sm text-gray-400 hidden sm:table-cell">${song.singers.map(s => s.name).join(', ')}</td>
+                        <td class="py-4 px-4 text-sm text-gray-400 hidden sm:table-cell">${song.album.name}</td>
+                        <td class="py-4 px-4 text-sm"></td>
+                        <td class="py-4 px-4 text-right text-sm"></td>
+                    `;
+                    row.querySelector('td:nth-child(5)').appendChild(qualityDropdown);
+                    const actionsCell = row.querySelector('td:nth-child(6)');
+                    actionsCell.appendChild(playBtn);
+                    actionsCell.appendChild(individualDownloadBtn);
+                    musicTableBody.appendChild(row);
+                });
+            }
+
+            // Applies the global quality setting to all individual dropdowns
+            applyQualityBtn.addEventListener('click', () => {
+                const globalValue = globalQualitySelect.value;
+                const songDropdowns = document.querySelectorAll('#musicTableBody select');
+                
+                // Iterate through each song to find its fileLinks
+                songDropdowns.forEach((dropdown, index) => {
+                    const song = allMusicData[index];
+                    let matchedQuality = false;
+
+                    // Check if the global quality is available for this song
+                    for (const link of song.fileLinks) {
+                        if (`${link.quality}_${link.format}` === globalValue) {
+                            dropdown.value = globalValue;
+                            matchedQuality = true;
+                            break;
+                        }
+                    }
+
+                    // If the global quality is not available, find the highest quality link for the selected format, or the overall best if the format doesn't exist
+                    if (!matchedQuality) {
+                        const [globalQuality, globalFormat] = globalValue.split('_');
+                        let bestMatch = { quality: 0 };
+                        
+                        // First, try to find the best quality for the selected format
+                        for (const link of song.fileLinks) {
+                            if (link.format === globalFormat && link.quality > bestMatch.quality) {
+                                bestMatch = link;
+                            }
+                        }
+
+                        // If a link with that format was found, use it
+                        if (bestMatch.quality > 0) {
+                             dropdown.value = `${bestMatch.quality}_${bestMatch.format}`;
+                        } else {
+                            // Otherwise, fallback to the overall best quality available for the song
+                            let overallBest = { quality: 0 };
+                            song.fileLinks.forEach(link => {
+                                if (link.quality > overallBest.quality) {
+                                    overallBest = link;
+                                }
+                            });
+                            dropdown.value = `${overallBest.quality}_${overallBest.format}`;
+                        }
+                    }
+                });
+            });
+
+            // Handles the download logic for a single file by fetching it as a Blob
+            async function downloadFileAsBlob(id, quality, format, title, artist) {
+                const downloadApiUrl = downloadApiUrlInput.value.trim();
+                const filename = `${title} - ${artist}.${format}`;
+                const downloadUrl = `${downloadApiUrl}?ID=${id}&quality=${quality}&format=${format}`;
+                console.log('Constructed download URL:', downloadUrl);
+                
+                // Using a proxy again for the download link to bypass CORS.
+                const proxyDownloadUrl = 'https://cors.eu.org/' + downloadUrl;
+
+                try {
+                    const response = await fetch(proxyDownloadUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('Error downloading file:', error);
+                    showMessageBox(`Failed to download song: ${title}. Please try again.`);
+                }
+            }
+
+            // Handles playing a song by fetching it as a Blob and setting it to the audio player
+            async function playSongAsBlob(id, quality, format, title, artist) {
+                const downloadApiUrl = downloadApiUrlInput.value.trim();
+                if (currentPlayingBlobUrl) {
+                    window.URL.revokeObjectURL(currentPlayingBlobUrl);
+                }
+
+                const playUrl = `${downloadApiUrl}?ID=${id}&quality=${quality}&format=${format}`;
+                const proxyPlayUrl = 'https://cors.eu.org/' + playUrl;
+                
+                try {
+                    const response = await fetch(proxyPlayUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+
+                    currentPlayingBlobUrl = url;
+                    audioPlayer.src = url;
+                    audioPlayer.play();
+                    
+                    audioPlayerContainer.classList.remove('hidden');
+                    currentSongTitle.textContent = `Now Playing: ${title} by ${artist}`;
+
+                } catch (error) {
+                    console.error('Error playing song:', error);
+                    showMessageBox(`Failed to play song: ${title}. Please try again.`);
+                }
+            }
+
+            // Select All / Deselect All functionality
+            masterCheckbox.addEventListener('change', () => {
+                const checkboxes = document.querySelectorAll('.song-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = masterCheckbox.checked;
+                });
+            });
+
+            selectAllBtn.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('.song-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+                masterCheckbox.checked = true;
+            });
+
+            // Batch download functionality
+            downloadAllBtn.addEventListener('click', async () => {
+                const selectedSongs = Array.from(document.querySelectorAll('.song-checkbox:checked'));
+                const delayInSeconds = parseInt(downloadDelayInput.value, 10) || 1; // Get user input or default to 1 second
+                const delayInMilliseconds = delayInSeconds * 1000;
+
+                if (selectedSongs.length === 0) {
+                    showMessageBox('Please select at least one song to download.');
+                    return;
+                }
+
+                statusMessage.textContent = '';
+                downloadMessage.classList.remove('hidden');
+
+                for (let i = 0; i < selectedSongs.length; i++) {
+                    const checkbox = selectedSongs[i];
+                    const row = checkbox.closest('tr');
+                    const id = checkbox.dataset.songId;
+                    const title = decodeURIComponent(checkbox.dataset.title);
+                    const artist = decodeURIComponent(checkbox.dataset.artist);
+                    const qualityDropdown = row.querySelector('select');
+                    const [quality, format] = qualityDropdown.value.split('_');
+
+                    // Introduce a user-defined delay between downloads
+                    if (i > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delayInMilliseconds));
+                    }
+                    downloadFileAsBlob(id, quality, format, title, artist);
+                }
+
+                setTimeout(() => {
+                    downloadMessage.classList.add('hidden');
+                }, selectedSongs.length * delayInMilliseconds + 2000); // Hide message after all downloads start
+            });
+        });
+    </script>
+
+</body>
+</html>
