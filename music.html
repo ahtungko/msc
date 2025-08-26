@@ -47,8 +47,24 @@
             <p class="text-gray-400">Search for music and download individual songs or in a batch.</p>
         </header>
 
-        <!-- API Configuration Section -->
-        <div class="space-y-4 p-4 bg-gray-700 rounded-xl shadow-inner">
+        <!-- Search Section with API Settings Button -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between mb-4">
+                <label for="searchKey" class="block text-sm font-medium text-gray-300">Search for an artist or song:</label>
+                <button id="toggleApiSettingsBtn" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    API Settings
+                </button>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="searchKey" placeholder="Enter search key..." class="flex-grow p-3 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-500">
+                <button id="fetchBtn" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 download-button">
+                    Search Music
+                </button>
+            </div>
+        </div>
+
+        <!-- API Configuration Section (Hidden by default) -->
+        <div id="apiSettingsContainer" class="hidden space-y-4 p-4 bg-gray-700 rounded-xl shadow-inner">
             <h2 class="text-xl font-bold">API Settings</h2>
             <div class="flex flex-col sm:flex-row gap-4">
                 <div class="flex-grow">
@@ -61,17 +77,6 @@
                 </div>
             </div>
             <p class="text-sm text-gray-400">APIs will be saved in your browser's local storage.</p>
-        </div>
-
-        <!-- Search Section -->
-        <div class="space-y-4">
-            <label for="searchKey" class="block text-sm font-medium text-gray-300">Search for an artist or song:</label>
-            <div class="flex flex-col sm:flex-row gap-4">
-                <input type="text" id="searchKey" placeholder="Enter search key..." class="flex-grow p-3 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-500">
-                <button id="fetchBtn" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 download-button">
-                    Search Music
-                </button>
-            </div>
         </div>
 
         <!-- Status & Loading -->
@@ -164,6 +169,8 @@
             const currentSongTitle = document.getElementById('currentSongTitle');
             const searchApiUrlInput = document.getElementById('searchApiUrl');
             const downloadApiUrlInput = document.getElementById('downloadApiUrl');
+            const toggleApiSettingsBtn = document.getElementById('toggleApiSettingsBtn');
+            const apiSettingsContainer = document.getElementById('apiSettingsContainer');
             const modal = document.createElement('div');
             
             let allMusicData = []; // Store the fetched music data globally
@@ -183,6 +190,10 @@
             searchApiUrlInput.value = savedSearchUrl || DEFAULT_API_SEARCH_URL;
             downloadApiUrlInput.value = savedDownloadUrl || DEFAULT_API_DOWNLOAD_URL;
 
+            // --- Event listener to toggle API Settings visibility ---
+            toggleApiSettingsBtn.addEventListener('click', () => {
+                apiSettingsContainer.classList.toggle('hidden');
+            });
             // --- End of localStorage Management ---
 
             // Displays a custom message box instead of alert()
