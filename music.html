@@ -60,7 +60,7 @@
                     <input type="url" id="downloadApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
                 </div>
             </div>
-            <p class="text-sm text-gray-400">APIs will be saved in your browser's cookies.</p>
+            <p class="text-sm text-gray-400">APIs will be saved in your browser's local storage.</p>
         </div>
 
         <!-- Search Section -->
@@ -172,51 +172,18 @@
             const pageSize = 20;
             let currentPlayingBlobUrl = null;
             
-            // Default URLs, will be overwritten by cookies if they exist
+            // Default URLs
             const DEFAULT_API_SEARCH_URL = 'https://music.wjhe.top/api/music/joox/search';
             const DEFAULT_API_DOWNLOAD_URL = 'https://music.wjhe.top/api/music/joox/url';
 
-            // --- Cookie Management Functions ---
-            function setCookie(name, value, days) {
-                const d = new Date();
-                d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-                const expires = "expires=" + d.toUTCString();
-                document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
-            }
+            // Load URLs from localStorage on page load
+            const savedSearchUrl = localStorage.getItem('searchApiUrl');
+            const savedDownloadUrl = localStorage.getItem('downloadApiUrl');
 
-            function getCookie(name) {
-                const cname = name + "=";
-                const decodedCookie = decodeURIComponent(document.cookie);
-                const ca = decodedCookie.split(';');
-                for(let i = 0; i < ca.length; i++) {
-                    let c = ca[i];
-                    while (c.charAt(0) === ' ') {
-                        c = c.substring(1);
-                    }
-                    if (c.indexOf(cname) === 0) {
-                        return c.substring(cname.length, c.length);
-                    }
-                }
-                return "";
-            }
+            searchApiUrlInput.value = savedSearchUrl || DEFAULT_API_SEARCH_URL;
+            downloadApiUrlInput.value = savedDownloadUrl || DEFAULT_API_DOWNLOAD_URL;
 
-            // Load URLs from cookies on page load
-            const savedSearchUrl = getCookie('searchApiUrl');
-            const savedDownloadUrl = getCookie('downloadApiUrl');
-
-            if (savedSearchUrl) {
-                searchApiUrlInput.value = savedSearchUrl;
-            } else {
-                searchApiUrlInput.value = DEFAULT_API_SEARCH_URL;
-            }
-
-            if (savedDownloadUrl) {
-                downloadApiUrlInput.value = savedDownloadUrl;
-            } else {
-                downloadApiUrlInput.value = DEFAULT_API_DOWNLOAD_URL;
-            }
-
-            // --- End of Cookie Management ---
+            // --- End of localStorage Management ---
 
             // Displays a custom message box instead of alert()
             function showMessageBox(message) {
@@ -235,9 +202,9 @@
                 const searchApiUrl = searchApiUrlInput.value.trim();
                 const downloadApiUrl = downloadApiUrlInput.value.trim();
 
-                // Save user-provided URLs to cookies for future use
-                setCookie('searchApiUrl', searchApiUrl, 365);
-                setCookie('downloadApiUrl', downloadApiUrl, 365);
+                // Save user-provided URLs to localStorage for future use
+                localStorage.setItem('searchApiUrl', searchApiUrl);
+                localStorage.setItem('downloadApiUrl', downloadApiUrl);
 
                 if (!searchKey || !searchApiUrl) {
                     showMessageBox('Please enter a search key and a valid Search API URL.');
