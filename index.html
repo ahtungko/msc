@@ -546,6 +546,8 @@
                     
                     audioPlayerContainer.classList.remove('hidden');
                     currentSongTitle.textContent = `Now Playing: ${title} by ${artist}`;
+                    // Update the document title to show the current song
+                    document.title = `${title} by ${artist}`;
 
                 } catch (error) {
                     console.error('Error playing song:', error);
