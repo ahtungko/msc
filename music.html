@@ -66,14 +66,25 @@
         <!-- API Configuration Section (Hidden by default) -->
         <div id="apiSettingsContainer" class="hidden space-y-4 p-4 bg-gray-700 rounded-xl shadow-inner">
             <h2 class="text-xl font-bold">API Settings</h2>
-            <div class="flex flex-col sm:flex-row gap-4">
-                <div class="flex-grow">
-                    <label for="searchApiUrl" class="block text-sm font-medium text-gray-300">Search API URL:</label>
-                    <input type="url" id="searchApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+            <div class="space-y-4">
+                <div>
+                    <label for="predefinedApiSelect" class="block text-sm font-medium text-gray-300">Choose a predefined API:</label>
+                    <select id="predefinedApiSelect" class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200">
+                        <option value="">-- Select API --</option>
+                        <option value="joox">Joox</option>
+                        <option value="migu">Migu</option>
+                        <option value="qobuz">Qobuz</option>
+                    </select>
                 </div>
-                <div class="flex-grow">
-                    <label for="downloadApiUrl" class="block text-sm font-medium text-gray-300">Download API URL:</label>
-                    <input type="url" id="downloadApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-grow">
+                        <label for="searchApiUrl" class="block text-sm font-medium text-gray-300">Search API URL:</label>
+                        <input type="url" id="searchApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+                    </div>
+                    <div class="flex-grow">
+                        <label for="downloadApiUrl" class="block text-sm font-medium text-gray-300">Download API URL:</label>
+                        <input type="url" id="downloadApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+                    </div>
                 </div>
             </div>
             <p class="text-sm text-gray-400">APIs will be saved in your browser's local storage.</p>
@@ -171,30 +182,52 @@
             const downloadApiUrlInput = document.getElementById('downloadApiUrl');
             const toggleApiSettingsBtn = document.getElementById('toggleApiSettingsBtn');
             const apiSettingsContainer = document.getElementById('apiSettingsContainer');
+            const predefinedApiSelect = document.getElementById('predefinedApiSelect');
             const modal = document.createElement('div');
             
-            let allMusicData = []; // Store the fetched music data globally
+            let allMusicData = [];
             let currentPage = 1;
             let totalPages = 1;
             const pageSize = 20;
             let currentPlayingBlobUrl = null;
+            let savedGlobalQuality = null;
+
+            // Predefined API configurations
+            const PREDEFINED_APIS = {
+                'joox': {
+                    search: 'https://music.wjhe.top/api/music/joox/search',
+                    download: 'https://music.wjhe.top/api/music/joox/url'
+                },
+                'migu': {
+                    search: 'https://music.wjhe.top/api/music/migu/search',
+                    download: 'https://music.wjhe.top/api/music/migu/url' // Corrected URL
+                },
+                'qobuz': {
+                    search: 'https://music.wjhe.top/api/music/qobuz/search', // Corrected URL
+                    download: 'https://music.wjhe.top/api/music/qobuz/url' // Corrected URL
+                }
+            };
             
-            // Default URLs
-            const DEFAULT_API_SEARCH_URL = 'https://music.wjhe.top/api/music/joox/search';
-            const DEFAULT_API_DOWNLOAD_URL = 'https://music.wjhe.top/api/music/joox/url';
+            // Event listener for the predefined API selector
+            predefinedApiSelect.addEventListener('change', (event) => {
+                const selectedApi = event.target.value;
+                if (selectedApi && PREDEFINED_APIS[selectedApi]) {
+                    searchApiUrlInput.value = PREDEFINED_APIS[selectedApi].search;
+                    downloadApiUrlInput.value = PREDEFINED_APIS[selectedApi].download;
+                }
+            });
 
             // Load URLs from localStorage on page load
             const savedSearchUrl = localStorage.getItem('searchApiUrl');
             const savedDownloadUrl = localStorage.getItem('downloadApiUrl');
 
-            searchApiUrlInput.value = savedSearchUrl || DEFAULT_API_SEARCH_URL;
-            downloadApiUrlInput.value = savedDownloadUrl || DEFAULT_API_DOWNLOAD_URL;
+            searchApiUrlInput.value = savedSearchUrl || PREDEFINED_APIS['joox'].search;
+            downloadApiUrlInput.value = savedDownloadUrl || PREDEFINED_APIS['joox'].download;
 
-            // --- Event listener to toggle API Settings visibility ---
+            // Event listener to toggle API Settings visibility
             toggleApiSettingsBtn.addEventListener('click', () => {
                 apiSettingsContainer.classList.toggle('hidden');
             });
-            // --- End of localStorage Management ---
 
             // Displays a custom message box instead of alert()
             function showMessageBox(message) {
@@ -228,6 +261,7 @@
                 musicListContainer.classList.add('hidden');
                 downloadMessage.classList.add('hidden');
                 allMusicData = [];
+                masterCheckbox.checked = false; // Reset the master checkbox on new page load
                 console.log(`Attempting to fetch music for "${searchKey}" on page ${pageIndex}`);
 
                 try {
@@ -325,6 +359,11 @@
                     });
                     globalQualitySelect.appendChild(optgroup);
                 }
+                
+                // If a global quality has been saved, select it in the dropdown
+                if (savedGlobalQuality) {
+                    globalQualitySelect.value = savedGlobalQuality;
+                }
 
                 songs.forEach((song, index) => {
                     const row = document.createElement('tr');
@@ -385,19 +424,19 @@
                     actionsCell.appendChild(individualDownloadBtn);
                     musicTableBody.appendChild(row);
                 });
+                // Apply the saved global quality to the newly rendered list
+                if (savedGlobalQuality) {
+                    applySavedQuality(savedGlobalQuality, allMusicData);
+                }
             }
 
-            // Applies the global quality setting to all individual dropdowns
-            applyQualityBtn.addEventListener('click', () => {
-                const globalValue = globalQualitySelect.value;
+            // A new function to apply the saved quality setting
+            function applySavedQuality(globalValue, songs) {
                 const songDropdowns = document.querySelectorAll('#musicTableBody select');
-                
-                // Iterate through each song to find its fileLinks
                 songDropdowns.forEach((dropdown, index) => {
-                    const song = allMusicData[index];
+                    const song = songs[index];
                     let matchedQuality = false;
 
-                    // Check if the global quality is available for this song
                     for (const link of song.fileLinks) {
                         if (`${link.quality}_${link.format}` === globalValue) {
                             dropdown.value = globalValue;
@@ -405,24 +444,17 @@
                             break;
                         }
                     }
-
-                    // If the global quality is not available, find the highest quality link for the selected format, or the overall best if the format doesn't exist
                     if (!matchedQuality) {
                         const [globalQuality, globalFormat] = globalValue.split('_');
                         let bestMatch = { quality: 0 };
-                        
-                        // First, try to find the best quality for the selected format
                         for (const link of song.fileLinks) {
                             if (link.format === globalFormat && link.quality > bestMatch.quality) {
                                 bestMatch = link;
                             }
                         }
-
-                        // If a link with that format was found, use it
                         if (bestMatch.quality > 0) {
                              dropdown.value = `${bestMatch.quality}_${bestMatch.format}`;
                         } else {
-                            // Otherwise, fallback to the overall best quality available for the song
                             let overallBest = { quality: 0 };
                             song.fileLinks.forEach(link => {
                                 if (link.quality > overallBest.quality) {
@@ -433,6 +465,13 @@
                         }
                     }
                 });
+            }
+
+            // Applies the global quality setting to all individual dropdowns
+            applyQualityBtn.addEventListener('click', () => {
+                const globalValue = globalQualitySelect.value;
+                savedGlobalQuality = globalValue; // Save the selected global value
+                applySavedQuality(globalValue, allMusicData);
             });
 
             // Handles the download logic for a single file by fetching it as a Blob
