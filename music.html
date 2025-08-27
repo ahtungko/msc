@@ -72,7 +72,7 @@
                     <select id="predefinedApiSelect" class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200">
                         <option value="">-- Select API --</option>
                         <option value="joox">Joox</option>
-                        <option value="migu">Migu</option>
+                        <!-- <option value="migu">Migu</option> -->
                         <option value="qobuz">Qobuz</option>
                     </select>
                 </div>
@@ -154,7 +154,8 @@
     <!-- Audio Player -->
     <div id="audioPlayerContainer" class="hidden fixed bottom-0 left-0 right-0 bg-gray-800 p-4 border-t border-gray-700 shadow-xl z-50">
         <h3 id="currentSongTitle" class="text-sm font-semibold text-gray-300 mb-2"></h3>
-        <audio id="audioPlayer" controls loop class="w-full"></audio>
+        <audio id="audioPlayer" controls loop class="w-full">
+        </audio>
     </div>
 
     <script>
@@ -189,7 +190,6 @@
             let currentPage = 1;
             let totalPages = 1;
             const pageSize = 20;
-            let currentPlayingBlobUrl = null;
             let savedGlobalQuality = null;
 
             // Predefined API configurations
@@ -200,11 +200,11 @@
                 },
                 'migu': {
                     search: 'https://music.wjhe.top/api/music/migu/search',
-                    download: 'https://music.wjhe.top/api/music/migu/url' // Corrected URL
+                    download: 'https://music.wjhe.top/api/music/migu/url'
                 },
                 'qobuz': {
-                    search: 'https://music.wjhe.top/api/music/qobuz/search', // Corrected URL
-                    download: 'https://music.wjhe.top/api/music/qobuz/url' // Corrected URL
+                    search: 'https://music.wjhe.top/api/music/qobuz/search',
+                    download: 'https://music.wjhe.top/api/music/qobuz/url'
                 }
             };
             
@@ -303,11 +303,17 @@
                 pageInfo.textContent = `Page ${currentPage} of ${totalPages} (Total songs: ${allMusicData.length})`;
             }
 
-            // Event listener for the main search button
+            // Event listener for the main search button and Enter key
             fetchBtn.addEventListener('click', () => {
                 const searchKey = searchKeyInput.value.trim();
                 currentPage = 1; // Reset to page 1 for new search
                 fetchData(searchKey, currentPage);
+            });
+            searchKeyInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault(); // Prevents form submission if input is in a form
+                    fetchBtn.click();
+                }
             });
 
             // Event listeners for pagination buttons
@@ -403,6 +409,8 @@
                     const playBtn = document.createElement('button');
                     playBtn.classList.add('bg-purple-600', 'text-white', 'font-medium', 'px-3', 'py-1', 'rounded-xl', 'hover:bg-purple-700', 'transition-colors', 'play-button', 'text-sm', 'ml-2');
                     playBtn.textContent = 'Play';
+                    // Pass the song ID to the play button for a unique identifier
+                    playBtn.setAttribute('data-song-id', song.ID);
                     playBtn.addEventListener('click', () => {
                         const [quality, format] = qualityDropdown.value.split('_');
                         playSongAsBlob(song.ID, quality, format, song.title, song.singers[0].name);
@@ -508,12 +516,17 @@
             // Handles playing a song by fetching it as a Blob and setting it to the audio player
             async function playSongAsBlob(id, quality, format, title, artist) {
                 const downloadApiUrl = downloadApiUrlInput.value.trim();
-                if (currentPlayingBlobUrl) {
-                    window.URL.revokeObjectURL(currentPlayingBlobUrl);
-                }
-
+                
                 const playUrl = `${downloadApiUrl}?ID=${id}&quality=${quality}&format=${format}`;
                 const proxyPlayUrl = 'https://cors.eu.org/' + playUrl;
+
+                // Create a loading spinner for the button
+                const playButton = document.querySelector(`button[data-song-id="${id}"]`);
+                // Let's add a loading state to the button
+                const spinnerHTML = `<div class="spinner w-4 h-4 rounded-full border-2 border-gray-600 border-t-white"></div>`;
+                const originalButtonContent = playButton.innerHTML;
+                playButton.innerHTML = spinnerHTML;
+                playButton.disabled = true;
                 
                 try {
                     const response = await fetch(proxyPlayUrl);
@@ -522,8 +535,12 @@
                     }
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
+                    
+                    // Revoke old URL to prevent memory leaks
+                    if (audioPlayer.src) {
+                        window.URL.revokeObjectURL(audioPlayer.src);
+                    }
 
-                    currentPlayingBlobUrl = url;
                     audioPlayer.src = url;
                     audioPlayer.play();
                     
@@ -533,6 +550,9 @@
                 } catch (error) {
                     console.error('Error playing song:', error);
                     showMessageBox(`Failed to play song: ${title}. Please try again.`);
+                } finally {
+                    playButton.innerHTML = originalButtonContent;
+                    playButton.disabled = false;
                 }
             }
 
