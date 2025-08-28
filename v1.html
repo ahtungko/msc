@@ -60,14 +60,47 @@
             <p class="text-gray-400">Search for music and download individual songs or in a batch.</p>
         </header>
 
-        <!-- Search Section -->
+        <!-- Search Section with API Settings Button -->
         <div class="space-y-4">
+            <div class="flex items-center justify-between mb-4">
+                <label for="searchKey" class="block text-sm font-medium text-gray-300">Search for an artist or song:</label>
+                <button id="toggleApiSettingsBtn" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    API Settings
+                </button>
+            </div>
             <div class="flex flex-col sm:flex-row gap-4">
                 <input type="text" id="searchKey" placeholder="Enter search key..." class="flex-grow p-3 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-500">
                 <button id="fetchBtn" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 download-button">
                     Search Music
                 </button>
             </div>
+        </div>
+
+        <!-- API Configuration Section (Hidden by default) -->
+        <div id="apiSettingsContainer" class="hidden space-y-4 p-4 bg-gray-700 rounded-xl shadow-inner">
+            <h2 class="text-xl font-bold">API Settings</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="predefinedApiSelect" class="block text-sm font-medium text-gray-300">Choose a predefined API:</label>
+                    <select id="predefinedApiSelect" class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200">
+                        <option value="">-- Select API --</option>
+                        <option value="joox">Joox</option>
+                        <option value="migu">Migu</option>
+                        <option value="qobuz">Qobuz</option>
+                    </select>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-grow">
+                        <label for="searchApiUrl" class="block text-sm font-medium text-gray-300">Search API URL:</label>
+                        <input type="url" id="searchApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+                    </div>
+                    <div class="flex-grow">
+                        <label for="downloadApiUrl" class="block text-sm font-medium text-gray-300">Download API URL:</label>
+                        <input type="url" id="downloadApiUrl" placeholder="https://..." class="w-full p-3 bg-gray-600 border border-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 placeholder-gray-400">
+                    </div>
+                </div>
+            </div>
+            <p class="text-sm text-gray-400">APIs will be saved in your browser's local storage.</p>
         </div>
 
         <!-- Status & Loading -->
@@ -164,21 +197,59 @@
             const audioPlayerContainer = document.getElementById('audioPlayerContainer');
             const audioPlayer = document.getElementById('audioPlayer');
             const currentSongTitle = document.getElementById('currentSongTitle');
+            const searchApiUrlInput = document.getElementById('searchApiUrl');
+            const downloadApiUrlInput = document.getElementById('downloadApiUrl');
+            const toggleApiSettingsBtn = document.getElementById('toggleApiSettingsBtn');
+            const apiSettingsContainer = document.getElementById('apiSettingsContainer');
+            const predefinedApiSelect = document.getElementById('predefinedApiSelect');
             const modal = document.createElement('div');
             
             // New references for the modal
             const downloadStatusModal = document.getElementById('downloadStatusModal');
             const modalStatusText = document.getElementById('modalStatusText');
             
-            // API URLs are now hardcoded to Joox
-            const searchApiUrl = 'https://music.wjhe.top/api/music/joox/search';
-            const downloadApiUrl = 'https://music.wjhe.top/api/music/joox/url';
-
             let allMusicData = [];
             let currentPage = 1;
             let totalPages = 1;
             const pageSize = 20;
             let savedGlobalQuality = null;
+
+            // Predefined API configurations
+            const PREDEFINED_APIS = {
+                'joox': {
+                    search: 'https://music.wjhe.top/api/music/joox/search',
+                    download: 'https://music.wjhe.top/api/music/joox/url'
+                },
+                'migu': {
+                    search: 'https://music.wjhe.top/api/music/migu/search',
+                    download: 'https://music.wjhe.top/api/music/migu/url'
+                },
+                'qobuz': {
+                    search: 'https://music.wjhe.top/api/music/qobuz/search',
+                    download: 'https://music.wjhe.top/api/music/qobuz/url'
+                }
+            };
+            
+            // Event listener for the predefined API selector
+            predefinedApiSelect.addEventListener('change', (event) => {
+                const selectedApi = event.target.value;
+                if (selectedApi && PREDEFINED_APIS[selectedApi]) {
+                    searchApiUrlInput.value = PREDEFINED_APIS[selectedApi].search;
+                    downloadApiUrlInput.value = PREDEFINED_APIS[selectedApi].download;
+                }
+            });
+
+            // Load URLs from localStorage on page load
+            const savedSearchUrl = localStorage.getItem('searchApiUrl');
+            const savedDownloadUrl = localStorage.getItem('downloadApiUrl');
+
+            searchApiUrlInput.value = savedSearchUrl || PREDEFINED_APIS['joox'].search;
+            downloadApiUrlInput.value = savedDownloadUrl || PREDEFINED_APIS['joox'].download;
+
+            // Event listener to toggle API Settings visibility
+            toggleApiSettingsBtn.addEventListener('click', () => {
+                apiSettingsContainer.classList.toggle('hidden');
+            });
 
             // Displays a custom message box instead of alert()
             function showMessageBox(message) {
@@ -194,8 +265,15 @@
             
             // Fetches data based on search key and page number
             async function fetchData(searchKey, pageIndex) {
-                if (!searchKey) {
-                    showMessageBox('Please enter a search key.');
+                const searchApiUrl = searchApiUrlInput.value.trim();
+                const downloadApiUrl = downloadApiUrlInput.value.trim();
+
+                // Save user-provided URLs to localStorage for future use
+                localStorage.setItem('searchApiUrl', searchApiUrl);
+                localStorage.setItem('downloadApiUrl', downloadApiUrl);
+
+                if (!searchKey || !searchApiUrl) {
+                    showMessageBox('Please enter a search key and a valid Search API URL.');
                     return;
                 }
                 
@@ -303,7 +381,6 @@
                     const optgroup = document.createElement('optgroup');
                     optgroup.label = format.toUpperCase();
                     
-                    // Sort by quality in descending order
                     uniqueFormats[format].sort((a, b) => b.quality - a.quality).forEach(item => {
                         const option = document.createElement('option');
                         option.value = item.value;
@@ -328,7 +405,6 @@
 
                     const qualityDropdown = document.createElement('select');
                     qualityDropdown.classList.add('w-full', 'bg-gray-700', 'border', 'border-gray-600', 'rounded-lg', 'p-2', 'text-gray-200');
-                    let lowestQuality = { quality: Infinity, format: '' };
                     let bestQuality = { quality: 0, format: '' };
                     
                     if (song.fileLinks && Array.isArray(song.fileLinks)) {
@@ -337,21 +413,13 @@
                             option.value = `${link.quality}_${link.format}`;
                             option.textContent = `${link.quality}kbps (${link.format})`;
                             qualityDropdown.appendChild(option);
-                            // Find the lowest quality link
-                            if (link.quality < lowestQuality.quality) {
-                                lowestQuality = link;
-                            }
-                            // Find the best quality link
                             if (link.quality > bestQuality.quality) {
                                 bestQuality = link;
                             }
                         });
                     }
-                    // Set the best quality as the default for download
-                    if (bestQuality.quality !== 0) {
-                        qualityDropdown.value = `${bestQuality.quality}_${bestQuality.format}`;
-                    }
-                    
+                    qualityDropdown.value = `${bestQuality.quality}_${bestQuality.format}`;
+
                     const individualDownloadBtn = document.createElement('button');
                     individualDownloadBtn.classList.add('bg-blue-600', 'text-white', 'font-medium', 'px-3', 'py-1', 'rounded-xl', 'hover:bg-blue-700', 'transition-colors', 'download-button', 'text-sm');
                     individualDownloadBtn.textContent = 'Download';
@@ -362,32 +430,26 @@
 
                     const playBtn = document.createElement('button');
                     playBtn.classList.add('bg-purple-600', 'text-white', 'font-medium', 'px-3', 'py-1', 'rounded-xl', 'hover:bg-purple-700', 'transition-colors', 'play-button', 'text-sm', 'ml-2');
-                    playBtn.innerHTML = '&#9654;'; // Use play icon instead of text
+                    playBtn.textContent = 'Play';
                     playBtn.setAttribute('data-song-id', song.ID);
                     playBtn.addEventListener('click', () => {
-                        // For playing, we override the dropdown and always use the lowest quality link
-                        let playQuality = lowestQuality.quality;
-                        let playFormat = lowestQuality.format;
-                        playSongAsBlob(song.ID, playQuality, playFormat, song.title, song.singers[0].name);
+                        const [quality, format] = qualityDropdown.value.split('_');
+                        playSongAsBlob(song.ID, quality, format, song.title, song.singers[0].name);
                     });
                     
                     row.innerHTML = `
                         <td class="py-4 px-4 text-sm">
                             <input type="checkbox" class="song-checkbox rounded text-blue-600 focus:ring-blue-500" data-song-id="${song.ID}" data-title="${encodeURIComponent(song.title)}" data-artist="${encodeURIComponent(song.singers[0].name)}">
                         </td>
-                        <td class="py-4 px-4 text-sm font-medium flex items-center"></td>
+                        <td class="py-4 px-4 text-sm font-medium">${song.title}</td>
                         <td class="py-4 px-4 text-sm text-gray-400 hidden sm:table-cell">${song.singers.map(s => s.name).join(', ')}</td>
                         <td class="py-4 px-4 text-sm text-gray-400 hidden sm:table-cell">${song.album.name}</td>
                         <td class="py-4 px-4 text-sm"></td>
-                        <td class="py-4 px-4 text-right text-sm"></td>
+                        <td class="py-4 px-4 text-right text-sm flex items-center justify-end"></td>
                     `;
-                    // Append the play button and title to the title cell in the correct order
-                    const titleCell = row.querySelector('td:nth-child(2)');
-                    titleCell.textContent = song.title;
-                    titleCell.appendChild(playBtn);
-                    
                     row.querySelector('td:nth-child(5)').appendChild(qualityDropdown);
                     const actionsCell = row.querySelector('td:nth-child(6)');
+                    actionsCell.appendChild(playBtn);
                     actionsCell.appendChild(individualDownloadBtn);
                     musicTableBody.appendChild(row);
                 });
@@ -461,6 +523,7 @@
             }
 
             async function downloadFileAsBlob(id, quality, format, title, artist) {
+                const downloadApiUrl = downloadApiUrlInput.value.trim();
                 const filename = `${title} - ${artist}.${format}`;
                 const downloadUrl = `${downloadApiUrl}?ID=${id}&quality=${quality}&format=${format}`;
                 
@@ -489,6 +552,8 @@
 
             // Handles playing a song by fetching it as a Blob and setting it to the audio player
             async function playSongAsBlob(id, quality, format, title, artist) {
+                const downloadApiUrl = downloadApiUrlInput.value.trim();
+                
                 const playUrl = `${downloadApiUrl}?ID=${id}&quality=${quality}&format=${format}`;
                 const proxyPlayUrl = 'https://cors.eu.org/' + playUrl;
 
