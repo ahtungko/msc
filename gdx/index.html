@@ -55,9 +55,8 @@
 
         /* 顶部导航 */
         .navbar {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: #1a1a1a; /* Use a solid dark color */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             padding: 15px 0;
             position: sticky;
             top: 0;
@@ -1483,6 +1482,12 @@
 
         .fa-repeat-1::before {
             content: "\f36a";
+        }
+
+        @media (max-width: 768px) {
+            .logo {
+                display: none;
+            }
         }
     </style>
 </head>
