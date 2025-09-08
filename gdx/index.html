@@ -3,8 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="iMusic" />
+    <meta name="theme-color" content="#000000" >
+    <meta name="google" content="notranslate" >
     <title>在线音乐播放器</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -479,14 +483,10 @@
             display: flex;
             justify-content: center;
             gap: 10px;
-            //margin-top: 10px;
+            
             opacity: 1;
             transition: opacity 0.3s ease;
         }
-        
-        //.player-lyrics-container:hover .lyrics-adjust-controls {
-         //   opacity: 1;
-        //}
         
         /* 偏移量显示 */
         .lyrics-offset-display {
@@ -1426,11 +1426,7 @@
                 font-size: 12px;
             }
             
-            /* 小屏幕歌词优化 */
-            //.player-lyrics-container {
-            //    height: 100px;
-            //}
-            
+
             .player-lyric-line {
                 font-size: 12px;
                 height: 24px;
@@ -1478,6 +1474,15 @@
             word-wrap: break-word;
             line-height: 1.4;
             padding: 4px 0;
+        }
+
+        .control-btn.active {
+            background: rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+        }
+
+        .fa-repeat-1::before {
+            content: "\f36a";
         }
     </style>
 </head>
@@ -1587,6 +1592,9 @@
                     <button class="lyrics-adjust-btn" onclick="adjustLyrics(-0.5)" title="歌词提前0.5秒" aria-label="歌词提前0.5秒">→</button>
                 </div>
             <div class="player-controls">
+                <button class="control-btn small" onclick="toggleRepeat()" aria-label="重复播放" id="repeatBtn">
+                    <i class="fas fa-repeat" aria-hidden="true"></i>
+                </button>
                 <button class="control-btn small" onclick="previousSong()" aria-label="上一首">
                     <i class="fas fa-step-backward" aria-hidden="true"></i>
                 </button>
@@ -1595,6 +1603,9 @@
                 </button>
                 <button class="control-btn small" onclick="nextSong()" aria-label="下一首">
                     <i class="fas fa-step-forward" aria-hidden="true"></i>
+                </button>
+                <button class="control-btn small" onclick="toggleShuffle()" aria-label="随机播放" id="shuffleBtn">
+                    <i class="fas fa-shuffle" aria-hidden="true"></i>
                 </button>
             </div>
 
@@ -1650,7 +1661,10 @@
         let currentLyrics = [];
         let isPlaying = false;
         let savedPlaylists = JSON.parse(localStorage.getItem('savedPlaylists')) || [];
-
+        let repeatMode = 0; // 0: No repeat, 1: Repeat all, 2: Repeat one
+        let isShuffling = false;
+        let originalPlaylist = [];
+        let shuffledPlaylist = [];
         const audioPlayer = document.getElementById('audioPlayer');
         const playBtn = document.getElementById('playBtn');
         const progressFill = document.getElementById('progressFill');
@@ -1741,6 +1755,69 @@
                     </div>
                 `;
             }
+        }
+
+        function toggleRepeat() {
+            repeatMode = (repeatMode + 1) % 3;
+            const repeatBtn = document.getElementById('repeatBtn');
+            const icon = repeatBtn.querySelector('i');
+
+            // Remove any active state
+            repeatBtn.classList.remove('active');
+
+            if (repeatMode === 1) {
+                // Repeat All
+                repeatBtn.classList.add('active');
+                icon.className = 'fas fa-repeat';
+                showNotification('已开启列表循环', 'info');
+            } else if (repeatMode === 2) {
+                // Repeat One
+                repeatBtn.classList.add('active');
+                // Change the icon to something that is supported
+                icon.className = 'fas fa-redo'; 
+                showNotification('已开启单曲循环', 'info');
+            } else {
+                // No Repeat
+                icon.className = 'fas fa-repeat';
+                showNotification('已关闭循环', 'info');
+            }
+        }
+
+        function toggleShuffle() {
+            isShuffling = !isShuffling;
+            const shuffleBtn = document.getElementById('shuffleBtn');
+            shuffleBtn.classList.toggle('active', isShuffling);
+            
+            if (isShuffling) {
+                // Save the current order before shuffling
+                originalPlaylist = [...currentPlaylist];
+                shuffledPlaylist = shuffleArray([...currentPlaylist]);
+                currentPlaylist = shuffledPlaylist;
+                showNotification('已开启随机播放', 'info');
+            } else {
+                // Restore the original order
+                currentPlaylist = originalPlaylist;
+                showNotification('已关闭随机播放', 'info');
+            }
+            
+            // Update the UI to reflect the new order
+            displaySearchResults(currentPlaylist);
+            // Find the new index of the current song
+            if (currentIndex !== -1) {
+                const currentSongId = originalPlaylist[currentIndex].id;
+                const newIndex = currentPlaylist.findIndex(song => song.id === currentSongId);
+                currentIndex = newIndex;
+                updateActiveItem();
+            }
+        }
+
+        // Fisher-Yates shuffle algorithm
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
         }
 
         // 获取专辑图片URL
@@ -1857,7 +1934,7 @@
                     if ('mediaSession' in navigator) {
                         // 1. 设置媒体元数据
                         const artworkUrl = await getAlbumCoverUrl(song, 500);
-                        console.log(artworkUrl);
+                        //console.log(artworkUrl);
                         navigator.mediaSession.metadata = new MediaMetadata({
                             title: song.name,
                             artist: Array.isArray(song.artist) ? song.artist.join(' / ') : song.artist,
@@ -2450,7 +2527,12 @@
             if (currentIndex < currentPlaylist.length - 1) {
                 playSong(currentIndex + 1);
             } else {
-                showNotification('已经是最后一首歌曲', 'info');
+                // If the user clicks "next" on the last song, either loop back or show a message.
+                if (repeatMode === 1) {
+                    playSong(0);
+                } else {
+                    showNotification('已经是最后一首歌曲', 'info');
+                }
             }
         }
 
@@ -2541,9 +2623,38 @@
         });
 
         audioPlayer.addEventListener('ended', () => {
-            // 重置歌词偏移量
-            lyricsOffset = 0;
-            nextSong();
+            // Check if repeat one is enabled. If so, just play the same song again.
+            if (repeatMode === 2) {
+                audioPlayer.currentTime = 0;
+                audioPlayer.play();
+                return;
+            }
+            
+            // Check if shuffling is enabled. If so, pick a random song from the shuffled list.
+            if (isShuffling) {
+                const randomIndex = Math.floor(Math.random() * currentPlaylist.length);
+                playSong(randomIndex);
+                showNotification(`随机播放下一首`, 'info');
+                return;
+            }
+            
+            // Check if it's the end of the playlist.
+            if (currentIndex < currentPlaylist.length - 1) {
+                // Play the next song in the current list (shuffled or original).
+                playSong(currentIndex + 1);
+            } else {
+                // End of the playlist. Check if "repeat all" is enabled.
+                if (repeatMode === 1) {
+                    playSong(0); // Start from the beginning of the list.
+                    showNotification('列表循环：从头开始播放', 'info');
+                } else {
+                    // No repeat is enabled, so stop playback.
+                    isPlaying = false;
+                    updatePlayButton();
+                    currentCover.classList.remove('playing');
+                    showNotification('播放结束', 'info');
+                }
+            }
         });
 
         audioPlayer.addEventListener('play', () => {
