@@ -1,0 +1,9 @@
+{
+  "name": "iMusic",
+  "short_name": "iMusic",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0c0c0c",
+  "theme_color": "#0c0c0c",
+  "description": "A web-based music player."
+}
