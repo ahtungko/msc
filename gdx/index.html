@@ -2045,7 +2045,7 @@ function toggleRepeat() {
             }
         }
         
-        // 播放歌曲
+        // MODIFIED FUNCTION: playSong
         async function playSong(index) {
             if (index < 0 || index >= activePlaylist.length) return;
 
@@ -2054,20 +2054,37 @@ function toggleRepeat() {
 
             await updateCurrentSongInfo(song);
             updateActiveItem();
-            
+
             lyricsOffset = 0;
             currentSongId = song.id;
             updateLyricsOffsetDisplay();
 
             try {
                 showNotification('正在加载音乐...', 'info');
-                
                 const quality = document.getElementById('qualitySelect').value;
-                const urlResponse = await fetch(`${API_BASE}?types=url&source=${song.source}&id=${song.id}&br=${quality}`);
-                const urlData = await urlResponse.json();
 
-                if (urlData && urlData.url) {
-                    audioPlayer.src = urlData.url;
+                // --- KEY CHANGE STARTS HERE ---
+                let songUrl;
+
+                // 1. Check if a URL was already preloaded for this song
+                if (song.preloadedUrl) {
+                    songUrl = song.preloadedUrl;
+                    console.log(`Using preloaded URL for: ${song.name}`);
+                    // Optional: Clear the preloaded URL after using it so it can be re-fetched if needed
+                    delete song.preloadedUrl; 
+                } else {
+                    // 2. If not preloaded, fetch it now (fallback)
+                    console.log(`Fetching URL on demand for: ${song.name}`);
+                    const urlResponse = await fetch(`${API_BASE}?types=url&source=${song.source}&id=${song.id}&br=${quality}`);
+                    const urlData = await urlResponse.json();
+                    if (urlData && urlData.url) {
+                        songUrl = urlData.url;
+                    }
+                }
+                // --- KEY CHANGE ENDS HERE ---
+
+                if (songUrl) {
+                    audioPlayer.src = songUrl;
                     audioPlayer.load();
                     
                     loadLyrics(song);
@@ -2081,7 +2098,11 @@ function toggleRepeat() {
                             isPlaying = true;
                             updatePlayButton();
                             currentCover.classList.add('playing');
-                            showNotification(`开始播放 (${getQualityText(urlData.br || quality)})`, 'success');
+                            
+                            // --- TRIGGER PRELOAD FOR THE NEXT SONG ---
+                            preloadNextSong(currentIndex); 
+                            // ------------------------------------------
+
                         }).catch(error => {
                             console.error('播放失败:', error);
                             showNotification('播放失败，请尝试其他歌曲', 'error');
@@ -2094,9 +2115,7 @@ function toggleRepeat() {
                             title: song.name,
                             artist: Array.isArray(song.artist) ? song.artist.join(' / ') : song.artist,
                             album: song.album,
-                            artwork: [
-                                { src: artworkUrl, sizes: '512x512', type: 'image/jpeg' },
-                            ]
+                            artwork: [{ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' }]
                         });
                         navigator.mediaSession.setActionHandler('play', () => { togglePlay(); });
                         navigator.mediaSession.setActionHandler('pause', () => { togglePlay(); });
@@ -2827,6 +2846,37 @@ function toggleRepeat() {
                 }
             } catch (error) {
                 console.error('导入歌单失败:', error);
+            }
+        }
+
+        // NEW FUNCTION: Preloads the URL for the next song in the playlist
+        async function preloadNextSong(currentIndex) {
+            const nextIndex = currentIndex + 1;
+
+            // 1. Check if there is a next song in the playlist
+            if (nextIndex < activePlaylist.length) {
+                const nextSong = activePlaylist[nextIndex];
+
+                // 2. If the URL is already preloaded, do nothing
+                if (nextSong.preloadedUrl) {
+                    console.log(`URL for "${nextSong.name}" is already preloaded.`);
+                    return;
+                }
+
+                // 3. Fetch the URL for the next song in the background
+                try {
+                    const quality = document.getElementById('qualitySelect').value;
+                    const urlResponse = await fetch(`${API_BASE}?types=url&source=${nextSong.source}&id=${nextSong.id}&br=${quality}`);
+                    const urlData = await urlResponse.json();
+
+                    if (urlData && urlData.url) {
+                        // 4. Store the preloaded URL on the song object itself
+                        nextSong.preloadedUrl = urlData.url;
+                        console.log(`Successfully preloaded URL for: ${nextSong.name}`);
+                    }
+                } catch (error) {
+                    console.error('Failed to preload next song:', error);
+                }
             }
         }
         
